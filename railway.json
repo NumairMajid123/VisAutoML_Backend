@@ -1,5 +1,8 @@
 {
+  "$schema": "https://schema.railpack.com",
   "build": {
+    "nixpacksVersion": "1.21.2",
+    "builder": "NIXPACKS"
     "steps": [
       "apt-get update && apt-get install -y wget build-essential libpq-dev python3-dev",
       "pip install --upgrade pip"
