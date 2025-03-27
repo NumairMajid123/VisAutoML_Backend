@@ -5,6 +5,6 @@
         "buildCommand": "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y libgomp1"
     },
     "deploy": {
-        "startCommand": "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn VisAutoML.wsgi"
+        "startCommand": "export LD_LIBRARY_PATH=/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH && python manage.py migrate && python manage.py collectstatic --noinput && gunicorn VisAutoML.wsgi"
     }
 }
