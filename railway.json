@@ -1,10 +1,10 @@
 {
-    "$schema": "https://railway.app/railway.schema.json",
-    "build": {
-        "builder": "RAILPACK",
-        "buildCommand": "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y libgomp1"
-    },
-    "deploy": {
-        "startCommand": "export LD_LIBRARY_PATH=/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH && python manage.py migrate && python manage.py collectstatic --noinput && gunicorn VisAutoML.wsgi"
-    }
+  "build": {
+    "steps": [
+      "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y libgomp1"
+    ]
+  },
+  "deploy": {
+    "startCommand": "export LD_LIBRARY_PATH=/usr/lib:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH && python manage.py migrate && python manage.py collectstatic --noinput && gunicorn VisAutoML.wsgi"
+  }
 }
