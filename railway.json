@@ -2,8 +2,8 @@
     "$schema": "https://railway.app/railway.schema.json",
     "build": {
         "builder": "RAILPACK",
-        "buildCommand": "/bin/sh -c 'apt-get update && apt-get install -y libgomp1'"
-    },
+        "buildCommand": "/bin/sh -c 'apt update && apt install -y libgomp1'"
+}
     "deploy": {
         "startCommand": "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn VisAutoML.wsgi"
     }
