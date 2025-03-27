@@ -1,15 +1,15 @@
 {
   "build": {
     "steps": [
-      "apt-get update && apt-get install -y wget build-essential",
+      "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y libgomp1 wget build-essential libc6-dev",
       "wget https://ftp.gnu.org/gnu/libc/glibc-2.36.tar.xz",
       "tar -xf glibc-2.36.tar.xz",
       "cd glibc-2.36",
-      "mkdir build",
-      "cd build",
-      "../configure --prefix=/usr",
+      "mkdir build && cd build",
+      "../configure --prefix=/usr --disable-sanity-checks",
       "make -j$(nproc)",
-      "make install"
+      "make install",
+      "ldconfig"
     ]
   },
   "deploy": {
