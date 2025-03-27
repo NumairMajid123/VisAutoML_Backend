@@ -1,19 +1,32 @@
-dash-auth
-dash-bootstrap-components
+# Core Django Packages
+Django
+djangorestframework
 django-cors-headers
 django-extensions
-djangorestframework
-dtreeviz
-flask-simplelogin
-jupyter-dash
-lightgbm
-oyaml
-pandasai
-pip-chill
-shap
-sqlglotrs
-waitress
-xgboost
-ydata-profiling==4.5.1
+
+# Data Science Packages
+numpy
+pandas
+scikit-learn
+lightgbm==4.1.0
+xgboost==2.0.3
 numba==0.57.1
+shap==0.44.0
+
+# Visualization
+dash-auth
+dash-bootstrap-components
+jupyter-dash
+dtreeviz
+ydata-profiling==4.5.1
+
+# Utility
+oyaml
+sqlglotrs
 whitenoise
+gunicorn
+waitress
+
+# Optional: Remove if not specifically needed
+flask-simplelogin
+pandasai
