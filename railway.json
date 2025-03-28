@@ -1,12 +1,8 @@
 {
   "build": {
+    "builder": "RAILPACK",
     "steps": [
-      "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y libgomp1",
-      "apk add --no-cache gcompat libc6-compat",
-      "wget http://ftp.gnu.org/gnu/libc/glibc-2.36.tar.gz",
-      "tar -xvzf glibc-2.36.tar.gz",
-      "cd glibc-2.36 && mkdir build && cd build",
-      "../configure --prefix=/usr && make -j$(nproc) && make install"
+      "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y libgomp1"
     ]
   },
   "deploy": {
