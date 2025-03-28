@@ -152,12 +152,36 @@ STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# # CORS Config
+# CORS_ORIGIN_ALLOW_ALL = True
+# CORS_ORIGIN_WHITELIST = [
+#     'http://localhost:3000',
+#     'http://192.168.144.88:3000',
+# ]
+# CORS_ALLOW_CREDENTIALS = True
+# CORS_ALLOW_HEADERS = [
+#     'accept',
+#     'accept-encoding',
+#     'authorization',
+#     'content-type',
+#     'dnt',
+#     'origin',
+#     'user-agent',
+#     'x-csrftoken',
+#     'x-requested-with',
+# ]
 # CORS Config
-CORS_ORIGIN_ALLOW_ALL = True
+CORS_ORIGIN_ALLOW_ALL = False  # Set to False for security
 CORS_ORIGIN_WHITELIST = [
     'http://localhost:3000',
     'http://192.168.144.88:3000',
+    'https://8341-14-192-210-146.ngrok-free.app',
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://8341-14-192-210-146.ngrok-free.app'
+]
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',
