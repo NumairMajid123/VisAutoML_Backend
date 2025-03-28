@@ -171,15 +171,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #     'x-requested-with',
 # ]
 # CORS Config
-CORS_ORIGIN_ALLOW_ALL = False  # Set to False for security
+CORS_ORIGIN_ALLOW_ALL = True  # Set to False for security
 CORS_ORIGIN_WHITELIST = [
     'http://localhost:3000',
     'http://192.168.144.88:3000',
-    'https://8341-14-192-210-146.ngrok-free.app',
+    'https://visautomlbackend-production.up.railway.app',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://8341-14-192-210-146.ngrok-free.app'
+    'https://visautomlbackend-production.up.railway.app'
 ]
 
 CORS_ALLOW_CREDENTIALS = True
