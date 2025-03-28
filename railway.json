@@ -1,8 +1,11 @@
 {
   "build": {
     "builder": "RAILPACK",
+    "packages": {
+      "apt": ["libgomp1"]
+    },
     "steps": [
-      "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y libgomp1",
+      "apt-get update",
       "python -m pip install --upgrade pip"
     ]
   },
