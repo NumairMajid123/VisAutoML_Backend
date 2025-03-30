@@ -13,6 +13,7 @@ class Model(models.Model):
     overall_score = models.DecimalField(
         blank=True, null=True, decimal_places=1, max_digits=4)
     data_set = models.FileField(upload_to="datasets/")
+    port = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.model_name
