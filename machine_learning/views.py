@@ -1,57 +1,74 @@
 import os
 import traceback
+import threading
+from multiprocessing import Process
+import pandas as pd
 
 from rest_framework import viewsets, status, decorators, views
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.shortcuts import render
 from django.http import JsonResponse
-from multiprocessing import Process
-import threading
-import pandas as pd
-import os
 
+from machine_learning.dashboard import runModel
 
 from .serializers import ModelSerializer, ModelDescriptionSerializer
-from .models import Model, ModelDescription
+from .models import Model, ModelDescription  # Make sure Model has a 'port' field (IntegerField, null=True, blank=True)
 from .review import get_review
 from .regression_custom_explainer import finishing
-from .dashboard import runModel
+# from .dashboard import runModel as original_runModel  # We now override runModel below
+
+# Base port and maximum dashboards to run concurrently
+BASE_PORT = 8050
+MAX_DASHBOARDS = 30
+
+def get_assigned_port(model_instance):
+    """
+    Returns the port assigned to a model instance.
+    If the model does not have a port, assign one from the available pool within BASE_PORT..(BASE_PORT+MAX_DASHBOARDS-1)
+    based on the last MAX_DASHBOARDS models that already have ports.
+    """
+    if model_instance.port:
+        return model_instance.port
+    else:
+        # Get last MAX_DASHBOARDS models with an assigned port
+        last_models = Model.objects.filter(port__isnull=False).order_by('-id')[:MAX_DASHBOARDS]
+        assigned_ports = [m.port for m in last_models if m.port is not None]
+        # Compute available ports in the range
+        available_ports = [p for p in range(BASE_PORT, BASE_PORT + MAX_DASHBOARDS) if p not in assigned_ports]
+        if available_ports:
+            return available_ports[0]
+        else:
+            # If all ports are taken, you could choose to recycle the smallest one (or implement a custom strategy)
+            return min(assigned_ports)
 
 def index(request):
-    # print(request)
-    # return request
     return render(request, "machine_learning/index.html")
 
 def dashboard(request, pk):
-    print("dashboard >>")
-
-    os.system("npx kill-port 8050")
-    runModel(pk)
-    return "Success"
-
-# @api_view(['POST'])
-# def chatbot_response(request):
-#     user_input = request.data.get('question')
-
-#     # Make sure to handle exceptions and errors appropriately
-
-#     response = openai.Completion.create(
-#       engine="text-davinci-003",
-#       prompt=user_input,
-#       max_tokens=150
-#     )
-
-#     return JsonResponse({'response': response.choices[0].text})
-
-
-
+    """
+    Launches the dashboard for the given model (by primary key) on its assigned port.
+    """
+    try:
+        model_instance = Model.objects.get(id=pk)
+        port = get_assigned_port(model_instance)
+        # Persist the port assignment if not already set
+        if not model_instance.port:
+            model_instance.port = port
+            model_instance.save()
+        # Kill any process on the assigned port
+        os.system("npx kill-port " + str(port))
+        # Launch the dashboard. Here we assume that the joblib file is named 'explainer_<model_id>.joblib'
+        runModel(str(pk), port)
+        return JsonResponse({"response": "Success", "port": port})
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({"error": str(e)}, status=500)
 
 class ModelViewSet(viewsets.ViewSet):
 
     def list(self, request):
         models = Model.objects.all().order_by('-id')
-        print("Getting models >>>",models)
         serializer = ModelSerializer(models, many=True)
         return Response(serializer.data)
 
@@ -59,24 +76,26 @@ class ModelViewSet(viewsets.ViewSet):
         try:
             serializer = ModelSerializer(data=request.data)
             if serializer.is_valid():
-                print("saving....", request.data)
-                model = serializer.save()
+                model_instance = serializer.save()
+                # Save the model ID globally if needed
                 global saved_id
-                saved_id = model.id
-                print("Saved --------")
-                result = get_review(model.data_set.path)
+                saved_id = model_instance.id
+                result = get_review(model_instance.data_set.path)
                 
                 description = ModelDescription.objects.create(
-                    model=model, description={})
+                    model=model_instance, description={})
                 description_serializer = ModelDescriptionSerializer(description)
                 
-                # about_to_finish = finishing()
-                # print(about_to_finish)
+                # Optionally assign a port to the new model if it is to be among the last 30 dashboards
+                port = get_assigned_port(model_instance)
+                model_instance.port = port
+                model_instance.save()
 
                 return Response(
                     {"response": result, 
                      "model": serializer.data, 
-                     "description": description_serializer.data
+                     "description": description_serializer.data,
+                     "port": port
                      })
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -89,29 +108,53 @@ class ModelViewSet(viewsets.ViewSet):
         return Response(serializer.data)
     
     def open(self, request, pk):
-        print("dashboard >>>>>", pk)
-
-        os.system("npx kill-port 8050")
-        os.system('explainerdashboard run '+pk+'.yaml --no-browser')
-        # os.system("explainerdashboard run explainer.joblib")
-
-        return Response({"response":"Success"})
-
+        """
+        Opens the dashboard for the specified model on its assigned port.
+        """
+        try:
+            model_instance = Model.objects.get(id=pk)
+            port = get_assigned_port(model_instance)
+            if not model_instance.port:
+                model_instance.port = port
+                model_instance.save()
+            # Kill any process on the port before launching
+            os.system("npx kill-port " + str(port))
+            # Here we assume you have a YAML config file named <pk>.yaml for this dashboard.
+            os.system('explainerdashboard run ' + str(pk) + '.yaml --no-browser --port=' + str(port))
+            return Response({"response": "Success", "port": port})
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=500)
 
 class ModelDescriptionViewSet(viewsets.ViewSet):
 
     def update(self, request, pk):
         description = ModelDescription.objects.get(id=pk)
-        serializer = ModelDescriptionSerializer(description, request.data)
+        serializer = ModelDescriptionSerializer(description, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 class FlaskModelViewSet(viewsets.ViewSet):
-    # {"model": 12, "id_column": "Survived", "prediction_column": "PassengerId", "not_to_use_columns": ["Name"],
-    #        "projectTitle": "test", "algo": "", "auto": 1, "unit": "", "description": 12}
+    """
+    This viewset launches the dashboard (for classification or regression) on a unique port.
+    Expected JSON input example:
+    {
+      "model": 12, 
+      "id_column": "Survived", 
+      "prediction_column": "PassengerId", 
+      "not_to_use_columns": ["Name"],
+      "projectTitle": "test", 
+      "algo": "", 
+      "auto": 1, 
+      "unit": "", 
+      "description": 12,
+      "split": "0.2",
+      "label0": "",
+      "label1": ""
+    }
+    """
     def list(self, request):
         models = Model.objects.all().order_by('-id')
         for each_item in models:
@@ -126,7 +169,7 @@ class FlaskModelViewSet(viewsets.ViewSet):
         try:
             model_obj = Model.objects.get(id=request.data["model"])
             model_id = request.data["model"]
-            model = model_obj.model_type
+            model_type = model_obj.model_type  # 'CL' for classification or 'RG' for regression
             description_obj = ModelDescription.objects.get(id=request.data["description"])
             train_csv_path = model_obj.data_set
             project_title = request.data["projectTitle"]
@@ -136,76 +179,64 @@ class FlaskModelViewSet(viewsets.ViewSet):
             model_obj.save()
             if algo == "":
                 algo = "auto"
-            if request.data["id_column"] == "":
-                id_column = "null"
-            else:
-                id_column = request.data["id_column"]
-            if request.data["prediction_column"] == "":
-                predict = "null"
-            else:
-                predict = request.data["prediction_column"]
-            if request.data["not_to_use_columns"]:
-                drop = request.data["not_to_use_columns"]
-            else:
-                drop = ["null"]
+            id_column = request.data.get("id_column", "null") or "null"
+            predict = request.data.get("prediction_column", "null") or "null"
+            drop = request.data.get("not_to_use_columns", ["null"]) or ["null"]
 
             descriptions = description_obj.description
-            unit = "null"
-            label0 = "null"
-            label1 = "null"
-            split = "null"
-            if "unit" in request.data:
-                if request.data["unit"] != "":
-                    unit = request.data["unit"]
-            if "label0" in request.data:
-                if request.data["label0"] != "":
-                    label0 = request.data["label0"]
-            if "label1" in request.data:
-                if request.data["label1"] != "":
-                    label1 = request.data["label1"]
-            if "split" in request.data:
-                if request.data["split"] != "":
-                    split = request.data["split"]
-            print(request.data)
-            # linux
-            # p = Process(target=self.run,
-            #                      args=(
-            #                          train_csv_path, project_title, auto, id_column, predict, drop, descriptions, algo,
-            #                          model_id,
-            #                          model, unit, label0, label1))
+            unit = request.data.get("unit", "null") or "null"
+            label0 = request.data.get("label0", "null") or "null"
+            label1 = request.data.get("label1", "null") or "null"
+            split = request.data.get("split", "null") or "null"
 
-            # windows
+            # Assign a unique port for this model
+            port = get_assigned_port(model_obj)
+            if not model_obj.port:
+                model_obj.port = port
+                model_obj.save()
+
+            # Run the dashboard in a separate thread so that it does not block the request
             p = threading.Thread(target=self.run,
                                  args=(
                                      train_csv_path, project_title, auto, id_column, predict, drop, descriptions, algo,
-                                     model_id,
-                                     model, unit, label0, label1, split))
-            print("thread+++++++++++")
+                                     model_id, model_type, unit, label0, label1, split, port))
             p.start()
             p.join()
-            return Response(data={"message": "success"}, status=status.HTTP_200_OK)
+            return Response(data={"message": "success", "port": port}, status=status.HTTP_200_OK)
         except Exception as e:
             traceback.print_exc()
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def run(self, train_csv_path, project_title, auto, id_column, predict, drop, descriptions, algo, model_id, model,
-            unit, label0, label1, split):
-        ""
-        # linux
-        # os.system("kill -9 `lsof -t -i:8050`")
-        # windows
-        print("Model id >>", model_id)
-        os.system("npx kill-port 8050")
-        if model in ['CL']:
-            print("view--------------------")
-            os.system(
-                'python machine_learning/classifier_custom_explainer.py ' + str(
-                    train_csv_path) + ' ' +'"'+ project_title +'"'+ ' ' + str(
-                    auto) + ' ' +'"'+ id_column +'"'+ ' ' +'"'+ predict +'"'+ ' ' + '"' + str(drop) + '"' + ' ' +'"'+ str(
-                    descriptions) +'"'+ ' ' + str(algo) + ' ' + str(model_id) + ' ' +'"'+ str(label0) +'"'+ ' ' +'"'+ str(label1) +'"'+ ' ' + '"' + str(split) + '"')
-            print("end+++++++++++")
+    def run(self, train_csv_path, project_title, auto, id_column, predict, drop, descriptions, algo, model_id, model_type,
+            unit, label0, label1, split, port):
+        """
+        Executes the custom explainer script (for classification or regression) on the assigned port.
+        It is assumed that your custom explainer scripts can handle a '--port' argument.
+        """
+        print("Launching dashboard for Model id >>", model_id)
+        os.system("npx kill-port " + str(port))
+        if model_type in ['CL']:
+            # Launch the classification explainer dashboard
+            command = (
+                'python machine_learning/classifier_custom_explainer.py ' + str(train_csv_path) + ' ' +
+                '"' + project_title + '"' + ' ' + str(auto) + ' ' +
+                '"' + id_column + '"' + ' ' + '"' + predict + '"' + ' ' +
+                '"' + str(drop) + '"' + ' ' + '"' + str(descriptions) + '"' + ' ' +
+                str(algo) + ' ' + str(model_id) + ' ' +
+                '"' + str(label0) + '"' + ' ' + '"' + str(label1) + '"' + ' ' +
+                '"' + str(split) + '"' + ' --port ' + str(port)
+            )
+            os.system(command)
+            print("Classification dashboard launched on port", port)
         else:
-            os.system(
-                'python machine_learning/regression_custom_explainer.py ' + str(
-                    train_csv_path) + ' ' +'"'+ project_title +'"'+ ' ' + str(
-                    auto) + ' ' +'"'+ id_column +'"'+ ' ' +'"'+ predict +'"'+ ' ' + '"' + str(drop) + '"' + ' ' +'"'+ str(
-                    descriptions) +'"'+ ' ' + str(algo) + ' ' + str(model_id) + ' ' +'"'+ str(unit) +'"'+ ' ' + '"' + str(split) + '"')
+            # Launch the regression explainer dashboard
+            command = (
+                'python machine_learning/regression_custom_explainer.py ' + str(train_csv_path) + ' ' +
+                '"' + project_title + '"' + ' ' + str(auto) + ' ' +
+                '"' + id_column + '"' + ' ' + '"' + predict + '"' + ' ' +
+                '"' + str(drop) + '"' + ' ' + '"' + str(descriptions) + '"' + ' ' +
+                str(algo) + ' ' + str(model_id) + ' ' +
+                '"' + str(unit) + '"' + ' ' + '"' + str(split) + '"' + ' --port ' + str(port)
+            )
+            os.system(command)
+            print("Regression dashboard launched on port", port)
