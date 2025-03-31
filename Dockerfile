@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y \
     gcc \
     libgomp1 \
     libc6 \
+    nodejs\
+    npm \
     && apt-get clean
 
 # Set the working directory
