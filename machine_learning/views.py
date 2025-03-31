@@ -22,6 +22,19 @@ from .regression_custom_explainer import finishing
 BASE_PORT = 8050
 MAX_DASHBOARDS = 30
 
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('model_operations.log'),
+        logging.StreamHandler()
+    ]
+)
+
 def get_assigned_port(model_instance):
     """
     Returns the port assigned to a model instance.
@@ -111,9 +124,16 @@ class ModelViewSet(viewsets.ViewSet):
         """
         Opens the dashboard for the specified model on its assigned port.
         """
+        # In the open method of ModelViewSet
         try:
             model_instance = Model.objects.get(id=pk)
             port = get_assigned_port(model_instance)
+            
+            # Add file existence check
+            yaml_file = f"{pk}.yaml"
+            if not os.path.exists(yaml_file):
+                return Response({"error": f"Configuration file {yaml_file} not found"}, status=404)
+                
             if not model_instance.port:
                 model_instance.port = port
                 model_instance.save()
@@ -169,6 +189,10 @@ class FlaskModelViewSet(viewsets.ViewSet):
         try:
             model_obj = Model.objects.get(id=request.data["model"])
             model_id = request.data["model"]
+            
+            # Log the start of model creation
+            logger.info(f"Starting model creation for ID: {model_id}")
+            
             model_type = model_obj.model_type  # 'CL' for classification or 'RG' for regression
             description_obj = ModelDescription.objects.get(id=request.data["description"])
             train_csv_path = model_obj.data_set
@@ -202,41 +226,65 @@ class FlaskModelViewSet(viewsets.ViewSet):
                                      model_id, model_type, unit, label0, label1, split, port))
             p.start()
             p.join()
+            
+            # Check if required files exist
+            yaml_path = f"{model_id}.yaml"
+            joblib_path = f"{model_id}.joblib"
+            
+            if os.path.exists(yaml_path):
+                logger.info(f"YAML file created successfully: {yaml_path}")
+            else:
+                logger.error(f"YAML file not found: {yaml_path}")
+            
+            if os.path.exists(joblib_path):
+                logger.info(f"Joblib file created successfully: {joblib_path}")
+            else:
+                logger.error(f"Joblib file not found: {joblib_path}")
+            
             return Response(data={"message": "success", "port": port}, status=status.HTTP_200_OK)
         except Exception as e:
-            traceback.print_exc()
+            logger.error(f"Error in model creation: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def run(self, train_csv_path, project_title, auto, id_column, predict, drop, descriptions, algo, model_id, model_type,
             unit, label0, label1, split, port):
-        """
-        Executes the custom explainer script (for classification or regression) on the assigned port.
-        It is assumed that your custom explainer scripts can handle a '--port' argument.
-        """
-        print("Launching dashboard for Model id >>", model_id)
-        os.system("npx kill-port " + str(port))
-        if model_type in ['CL']:
-            # Launch the classification explainer dashboard
-            command = (
-                'python machine_learning/classifier_custom_explainer.py ' + str(train_csv_path) + ' ' +
-                '"' + project_title + '"' + ' ' + str(auto) + ' ' +
-                '"' + id_column + '"' + ' ' + '"' + predict + '"' + ' ' +
-                '"' + str(drop) + '"' + ' ' + '"' + str(descriptions) + '"' + ' ' +
-                str(algo) + ' ' + str(model_id) + ' ' +
-                '"' + str(label0) + '"' + ' ' + '"' + str(label1) + '"' + ' ' +
-                '"' + str(split) + '"' + ' --port ' + str(port)
-            )
-            os.system(command)
-            print("Classification dashboard launched on port", port)
-        else:
-            # Launch the regression explainer dashboard
-            command = (
-                'python machine_learning/regression_custom_explainer.py ' + str(train_csv_path) + ' ' +
-                '"' + project_title + '"' + ' ' + str(auto) + ' ' +
-                '"' + id_column + '"' + ' ' + '"' + predict + '"' + ' ' +
-                '"' + str(drop) + '"' + ' ' + '"' + str(descriptions) + '"' + ' ' +
-                str(algo) + ' ' + str(model_id) + ' ' +
-                '"' + str(unit) + '"' + ' ' + '"' + str(split) + '"' + ' --port ' + str(port)
-            )
-            os.system(command)
-            print("Regression dashboard launched on port", port)
+        try:
+            logger.info(f"Starting dashboard for Model ID: {model_id} on port {port}")
+            logger.info(f"Model type: {model_type}")
+            logger.info(f"Training data path: {train_csv_path}")
+            
+            # Kill existing process
+            os.system("npx kill-port " + str(port))
+            
+            # Construct and log the command
+            if model_type in ['CL']:
+                command = (
+                    'python machine_learning/classifier_custom_explainer.py ' + str(train_csv_path) + ' ' +
+                    '"' + project_title + '"' + ' ' + str(auto) + ' ' +
+                    '"' + id_column + '"' + ' ' + '"' + predict + '"' + ' ' +
+                    '"' + str(drop) + '"' + ' ' + '"' + str(descriptions) + '"' + ' ' +
+                    str(algo) + ' ' + str(model_id) + ' ' +
+                    '"' + str(label0) + '"' + ' ' + '"' + str(label1) + '"' + ' ' +
+                    '"' + str(split) + '"' + ' --port ' + str(port)
+                )
+                logger.info(f"Executing classification command: {command}")
+            else:
+                command = (
+                    'python machine_learning/regression_custom_explainer.py ' + str(train_csv_path) + ' ' +
+                    '"' + project_title + '"' + ' ' + str(auto) + ' ' +
+                    '"' + id_column + '"' + ' ' + '"' + predict + '"' + ' ' +
+                    '"' + str(drop) + '"' + ' ' + '"' + str(descriptions) + '"' + ' ' +
+                    str(algo) + ' ' + str(model_id) + ' ' +
+                    '"' + str(unit) + '"' + ' ' + '"' + str(split) + '"' + ' --port ' + str(port)
+                )
+                logger.info(f"Executing regression command: {command}")
+            
+            # Execute command and log result
+            result = os.system(command)
+            logger.info(f"Command execution completed with status: {result}")
+            
+        except Exception as e:
+            logger.error(f"Error running model {model_id}: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
