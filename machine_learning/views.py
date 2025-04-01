@@ -241,7 +241,42 @@ class FlaskModelViewSet(viewsets.ViewSet):
             else:
                 logger.error(f"Joblib file not found: {joblib_path}")
             
+            # Define absolute paths for model files
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            joblib_path = os.path.join(base_dir, f"{model_id}.joblib")
+            yaml_path = os.path.join(base_dir, f"{model_id}.yaml")
+            
+            logger.info(f"Expected joblib path: {joblib_path}")
+            logger.info(f"Expected yaml path: {yaml_path}")
+            
+            # Run the dashboard in a separate thread
+            p = threading.Thread(target=self.run,
+                               args=(train_csv_path, project_title, auto, id_column, predict, drop, descriptions, algo,
+                                   model_id, model_type, unit, label0, label1, split, port))
+            p.start()
+            p.join()
+            
+            # Check if files were created
+            if os.path.exists(joblib_path):
+                logger.info(f"Joblib file created successfully at: {joblib_path}")
+                file_size = os.path.getsize(joblib_path)
+                logger.info(f"Joblib file size: {file_size} bytes")
+            else:
+                logger.error(f"Joblib file not found at: {joblib_path}")
+            
+            if os.path.exists(yaml_path):
+                logger.info(f"YAML file created successfully at: {yaml_path}")
+                file_size = os.path.getsize(yaml_path)
+                logger.info(f"YAML file size: {file_size} bytes")
+            else:
+                logger.error(f"YAML file not found at: {yaml_path}")
+            
+            # List directory contents
+            dir_contents = os.listdir(base_dir)
+            logger.info(f"Directory contents: {dir_contents}")
+            
             return Response(data={"message": "success", "port": port}, status=status.HTTP_200_OK)
+            
         except Exception as e:
             logger.error(f"Error in model creation: {str(e)}")
             logger.error(f"Traceback: {traceback.format_exc()}")
@@ -250,37 +285,30 @@ class FlaskModelViewSet(viewsets.ViewSet):
     def run(self, train_csv_path, project_title, auto, id_column, predict, drop, descriptions, algo, model_id, model_type,
             unit, label0, label1, split, port):
         try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            os.chdir(base_dir)  # Change to base directory before running command
+            
+            logger.info(f"Current working directory: {os.getcwd()}")
             logger.info(f"Starting dashboard for Model ID: {model_id} on port {port}")
-            logger.info(f"Model type: {model_type}")
-            logger.info(f"Training data path: {train_csv_path}")
             
             # Kill existing process
-            os.system("npx kill-port " + str(port))
+            os.system(f"npx kill-port {port}")
             
-            # Construct and log the command
+            # Construct command with absolute paths
             if model_type in ['CL']:
                 command = (
-                    'python machine_learning/classifier_custom_explainer.py ' + str(train_csv_path) + ' ' +
-                    '"' + project_title + '"' + ' ' + str(auto) + ' ' +
-                    '"' + id_column + '"' + ' ' + '"' + predict + '"' + ' ' +
-                    '"' + str(drop) + '"' + ' ' + '"' + str(descriptions) + '"' + ' ' +
-                    str(algo) + ' ' + str(model_id) + ' ' +
-                    '"' + str(label0) + '"' + ' ' + '"' + str(label1) + '"' + ' ' +
-                    '"' + str(split) + '"' + ' --port ' + str(port)
+                    f'python {os.path.join(base_dir, "machine_learning/classifier_custom_explainer.py")} '
+                    f'{train_csv_path} "{project_title}" {auto} "{id_column}" "{predict}" "{drop}" '
+                    f'"{descriptions}" {algo} {model_id} "{label0}" "{label1}" "{split}" --port {port}'
                 )
-                logger.info(f"Executing classification command: {command}")
             else:
                 command = (
-                    'python machine_learning/regression_custom_explainer.py ' + str(train_csv_path) + ' ' +
-                    '"' + project_title + '"' + ' ' + str(auto) + ' ' +
-                    '"' + id_column + '"' + ' ' + '"' + predict + '"' + ' ' +
-                    '"' + str(drop) + '"' + ' ' + '"' + str(descriptions) + '"' + ' ' +
-                    str(algo) + ' ' + str(model_id) + ' ' +
-                    '"' + str(unit) + '"' + ' ' + '"' + str(split) + '"' + ' --port ' + str(port)
+                    f'python {os.path.join(base_dir, "machine_learning/regression_custom_explainer.py")} '
+                    f'{train_csv_path} "{project_title}" {auto} "{id_column}" "{predict}" "{drop}" '
+                    f'"{descriptions}" {algo} {model_id} "{unit}" "{split}" --port {port}'
                 )
-                logger.info(f"Executing regression command: {command}")
             
-            # Execute command and log result
+            logger.info(f"Executing command: {command}")
             result = os.system(command)
             logger.info(f"Command execution completed with status: {result}")
             
