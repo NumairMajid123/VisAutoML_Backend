@@ -19,8 +19,10 @@
   "deploy": {
     "startCommand": "gunicorn VisAutoML.wsgi",
     "env": {
-      "API_BASE_URL": "https://8341-14-192-210-146.ngrok-free.app/",
-      "BACKEND_BASE_URL": "https://8341-14-192-210-146.ngrok-free.app/api/"
+      "API_BASE_URL": "https://visautomlbackend-production.up.railway.app/",
+      "BACKEND_BASE_URL": "https://visautomlbackend-production.up.railway.app/api/",
+      "RAILWAY_ENVIRONMENT": "production",
+      "ALLOWED_HOSTS": "visautomlbackend-production.up.railway.app"
     }
   }
 }
