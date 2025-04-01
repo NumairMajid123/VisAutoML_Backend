@@ -128,18 +128,26 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
 STATIC_URL = '/static/'
-MEDIA_URL = '/media/'
 
 # The absolute path to the directory where collectstatic will collect static files for deployment.
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Define directories where Django will look for static files
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
     os.path.join(BASE_DIR, 'machine_learning/static'),
-    # Include the img directory as a static files directory
+    os.path.join(BASE_DIR, 'static'),
     os.path.join(BASE_DIR, 'img'),
 ]
+
+# Disable source maps in production
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+
+# Media files configuration
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Set debug to False in production
+DEBUG = False
 
 # Media files (User uploaded files)
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -174,12 +182,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ORIGIN_ALLOW_ALL = True  # Set to False for security
 CORS_ORIGIN_WHITELIST = [
     'http://localhost:3000',
+    'http://localhost:8000',
     'http://192.168.144.88:3000',
     'https://visautomlbackend-production.up.railway.app',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://visautomlbackend-production.up.railway.app'
+    'https://visautomlbackend-production.up.railway.app',
+    'http://localhost:8000',
 ]
 
 CORS_ALLOW_CREDENTIALS = True
