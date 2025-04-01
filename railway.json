@@ -17,7 +17,7 @@
     }
   },
   "deploy": {
-    "startCommand": "gunicorn VisAutoML.wsgi --bind 0.0.0.0:8000",
+    "startCommand": "gunicorn VisAutoML.wsgi",
     "env": {
       "PORT": "8000",
       "API_BASE_URL": "https://visautomlbackend-production.up.railway.app/",
