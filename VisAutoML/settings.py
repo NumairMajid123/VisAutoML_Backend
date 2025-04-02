@@ -204,3 +204,7 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+# Add memory optimization for Numba
+import numba
+numba.config.THREADING_LAYER = 'workqueue'
+numba.config.DISABLE_JIT = False  # Keep JIT enabled but optimize memory
