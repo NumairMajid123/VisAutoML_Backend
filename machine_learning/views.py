@@ -221,25 +221,10 @@ class FlaskModelViewSet(viewsets.ViewSet):
 
             # Run the dashboard in a separate thread so that it does not block the request
             p = threading.Thread(target=self.run,
-                                 args=(
-                                     train_csv_path, project_title, auto, id_column, predict, drop, descriptions, algo,
-                                     model_id, model_type, unit, label0, label1, split, port))
+                               args=(train_csv_path, project_title, auto, id_column, predict, drop, descriptions, algo,
+                                   model_id, model_type, unit, label0, label1, split, port))
             p.start()
             p.join()
-            
-            # Check if required files exist
-            yaml_path = f"{model_id}.yaml"
-            joblib_path = f"{model_id}.joblib"
-            
-            if os.path.exists(yaml_path):
-                logger.info(f"YAML file created successfully: {yaml_path}")
-            else:
-                logger.error(f"YAML file not found: {yaml_path}")
-            
-            if os.path.exists(joblib_path):
-                logger.info(f"Joblib file created successfully: {joblib_path}")
-            else:
-                logger.error(f"Joblib file not found: {joblib_path}")
             
             # Define absolute paths for model files
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -248,13 +233,6 @@ class FlaskModelViewSet(viewsets.ViewSet):
             
             logger.info(f"Expected joblib path: {joblib_path}")
             logger.info(f"Expected yaml path: {yaml_path}")
-            
-            # Run the dashboard in a separate thread
-            p = threading.Thread(target=self.run,
-                               args=(train_csv_path, project_title, auto, id_column, predict, drop, descriptions, algo,
-                                   model_id, model_type, unit, label0, label1, split, port))
-            p.start()
-            p.join()
             
             # Check if files were created
             if os.path.exists(joblib_path):
